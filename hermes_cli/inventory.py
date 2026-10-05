@@ -240,6 +240,69 @@ def build_model_options_payload(
     if not refresh:
         _prewarm_pricing_async(payload["providers"], current_provider=ctx.current_provider,
                                current_base_url=ctx.current_base_url)
+    # Fallback to default model if model not set
+    if not payload.get("model") and payload.get("provider"):
+        from hermes_cli.models import get_default_model_for_provider
+        default_model = get_default_model_for_provider(payload["provider"])
+        if default_model:
+            payload["model"] = default_model
+    elif not payload.get("model") and not payload.get("provider"):
+        # fallback to root config's fallback_providers or default model/provider
+        try:
+            from hermes_cli.config import load_config_readonly
+            from hermes_constants import get_hermes_home
+            from pathlib import Path
+            home = get_hermes_home()
+            # Determine if we are in a profile directory
+            parts = home.parts
+            if "profiles" in parts:
+                idx = parts.index("profiles")
+                if idx > 0:
+                    root = Path(*parts[:idx])
+                    root_cfg_path = root / "config.yaml"
+                    if root_cfg_path.is_file():
+                        import yaml
+                        with open(root_cfg_path, encoding="utf-8-sig") as f:
+                            root_cfg = yaml.safe_load(f) or {}
+                    else:
+                        root_cfg = {}
+                else:
+                    root_cfg = {}
+            else:
+                root_cfg = load_config_readonly()
+            # First, try to get a fallback provider entry
+            fallback_list = root_cfg.get("fallback_providers", [])
+            selected_provider = None
+            selected_model = None
+            for entry in fallback_list:
+                if isinstance(entry, dict):
+                    prov = entry.get("provider")
+                    model = entry.get("model")
+                    if prov and model:
+                        selected_provider = prov
+                        selected_model = model
+                        break
+            if selected_provider is not None:
+                payload["provider"] = selected_provider
+                payload["model"] = selected_model
+            else:
+                # fallback to root config's default model/provider
+                model_cfg = root_cfg.get("model", {})
+                if isinstance(model_cfg, dict):
+                    default_model = model_cfg.get("default") or model_cfg.get("model")
+                    default_provider = model_cfg.get("provider")
+                elif isinstance(model_cfg, str):
+                    default_model = model_cfg
+                    default_provider = None
+                else:
+                    default_model = ""
+                    default_provider = None
+                if default_model:
+                    payload["model"] = default_model
+                    if default_provider:
+                        payload["provider"] = default_provider
+        except Exception:
+            pass
     return payload
 
 

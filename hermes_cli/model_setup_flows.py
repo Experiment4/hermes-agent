@@ -71,10 +71,12 @@ def _model_flow_openrouter(config, current_model=""):
     selected = _prompt_model_selection(
         openrouter_models, current_model=current_model, pricing=pricing, confirm_provider="openrouter",
         confirm_base_url=OPENROUTER_BASE_URL, confirm_api_key=_resolved or existing_key)
+    # If user skipped selection and no current model, pick provider default
+    if selected is None and not current_model:
+        from hermes_cli.models import get_default_model_for_provider
+        selected = get_default_model_for_provider("openrouter")
     _finish_model(selected, "openrouter", f"Default model set to: {selected} (via OpenRouter)",
                   base_url=OPENROUTER_BASE_URL, api_mode="chat_completions")
-
-
 def _model_flow_ai_gateway(config, current_model=""):
     """Vercel AI Gateway provider: ensure API key, then pick model with pricing."""
     from hermes_constants import AI_GATEWAY_BASE_URL
@@ -95,11 +97,13 @@ def _model_flow_ai_gateway(config, current_model=""):
     models_list = ai_gateway_model_ids(force_refresh=True)
     pricing = get_pricing_for_provider("ai-gateway", force_refresh=True)
     selected = _prompt_model_selection(models_list, current_model=current_model, pricing=pricing)
+    # If user skipped selection and no current model, pick provider default
+    if selected is None and not current_model:
+        from hermes_cli.models import get_default_model_for_provider
+        selected = get_default_model_for_provider("ai-gateway")
     # Inline credentials are deliberately left untouched here (historical behavior).
     _finish_model(selected, "ai-gateway", f"Default model set to: {selected} (via Vercel AI Gateway)",
                   base_url=AI_GATEWAY_BASE_URL, api_mode="chat_completions", clear_creds=False)
-
-
 def _model_flow_moa(config, current_model=""):
     """Mixture of Agents virtual provider: pick a preset (list always shown, even with one entry),
     persist it, print the breakdown. No credential step — presets reference configured providers."""

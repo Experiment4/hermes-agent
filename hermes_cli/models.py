@@ -497,6 +497,63 @@ def recommended_nous_default_model() -> dict[str, Any]:
 def get_default_model_for_provider(provider: str) -> str:
     """Cost-safe default model for a provider, or "" — the NON-INTERACTIVE fallback when a provider
     is configured but no model was ever selected."""
+    # First, check fallback_providers from root config (respecting profile overrides)
+    try:
+        from hermes_cli.config import load_config_readonly
+        from hermes_constants import get_hermes_home
+        from pathlib import Path
+        cfg = load_config_readonly()
+        fallback_list = cfg.get("fallback_providers", [])
+        selected_model = None
+        selected_provider = None
+        for entry in fallback_list:
+            if isinstance(entry, dict):
+                prov = entry.get("provider")
+                model = entry.get("model")
+                if prov and model:
+                    selected_provider = prov
+                    selected_model = model
+                    break
+        if selected_model is not None:
+            return selected_model
+    except Exception:
+        pass
+    # If we are in a profile directory (HERMES_HOME overridden to a profile), also check root config
+    try:
+        from hermes_constants import get_hermes_home
+        from pathlib import Path
+        home = get_hermes_home()
+        # Determine if home is inside a profiles directory
+        parts = home.parts
+        if "profiles" in parts:
+            # Find the index of profiles
+            idx = parts.index("profiles")
+            # Root is the directory before profiles
+            if idx > 0:
+                root = Path(*parts[:idx])
+                root_cfg_path = root / "config.yaml"
+                if root_cfg_path.is_file():
+                    import yaml
+                    with open(root_cfg_path, encoding="utf-8-sig") as f:
+                        root_cfg = yaml.safe_load(f) or {}
+                    fallback_list = root_cfg.get("fallback_providers", [])
+                    for entry in fallback_list:
+                        if isinstance(entry, dict):
+                            prov = entry.get("provider")
+                            model = entry.get("model")
+                            if prov and model:
+                                return model
+                    # Also check root config's default model/provider
+                    model_cfg = root_cfg.get("model", {})
+                    if isinstance(model_cfg, dict):
+                        default_model = model_cfg.get("default") or model_cfg.get("model")
+                        if default_model:
+                            return default_model
+                    elif isinstance(model_cfg, str):
+                        return model_cfg
+                # else fall through to normal logic
+    except Exception:
+        pass
     models = _PROVIDER_MODELS.get(provider, [])
     if provider in _SILENT_DEFAULT_PROVIDERS:
         preferred = get_preferred_silent_default_model(provider)
@@ -505,8 +562,6 @@ def get_default_model_for_provider(provider: str) -> str:
         if preferred and (preferred in models or not models):
             return preferred
     return models[0] if models else ""
-
-
 def _openrouter_model_is_free(pricing: Any) -> bool:
     return _zero_priced(pricing, ("prompt", "completion"), "0")
 
