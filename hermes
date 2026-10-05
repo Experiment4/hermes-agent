@@ -3,8 +3,14 @@
 Hermes Agent CLI launcher.
 
 This wrapper should behave like the installed `hermes` command, including
-subcommands such as `gateway`, `cron`, and `doctor`.
+subcommands such as `gateway`, `cron`, and `doctor".
 """
+import sys
+import os
+# Add the directory containing this script to sys.path so that hermes_cli can be imported
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+if _script_dir not in sys.path:
+    sys.path.insert(0, _script_dir)
 
 if __name__ == "__main__":
     from hermes_cli.main import main

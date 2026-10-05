@@ -61,7 +61,7 @@ def _model_flow_openrouter(config, current_model=""):
     existing_key, _resolved, abort = _ensure_flow_api_key(
         "openrouter", pconfig, missing_hint=("Get one at: https://openrouter.ai/keys", ""))
     if abort:
-        return
+        _resolved = ""
 
     from hermes_cli.models import model_ids
     from hermes_cli.models_pricing import get_pricing_for_provider
@@ -90,7 +90,7 @@ def _model_flow_ai_gateway(config, current_model=""):
              "Add a payment method to get $5 in free credits.", "")
     _resolved, abort = _prompt_api_key(pconfig, existing_key, provider_id="ai-gateway")
     if abort:
-        return
+        _resolved = ""
 
     from hermes_cli.models import ai_gateway_model_ids
     from hermes_cli.models_pricing import get_pricing_for_provider
